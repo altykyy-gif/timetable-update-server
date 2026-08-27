@@ -191,7 +191,9 @@ async function checkExeUpdate() {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.setFeedURL({ provider: 'generic', url: config.exeUpdateUrl });
-    const result = await autoUpdater.checkForUpdates();
+    const updateCheck = autoUpdater.checkForUpdates();
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('انتهت مهلة فحص تحديث EXE.')), 15000));
+    const result = await Promise.race([updateCheck, timeout]);
     const info = result?.updateInfo || {};
     const available = Boolean(info.version && info.version !== app.getVersion() && compareVersions(info.version, app.getVersion()) > 0);
     exeUpdateState = { configured: true, available, downloaded: false, version: info.version || '', notes: info.releaseNotes || '' };

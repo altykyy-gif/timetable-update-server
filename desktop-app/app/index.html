@@ -4050,6 +4050,8 @@
             const tools = document.getElementById('desktopUpdateTools');
             let heartbeatTimer = null;
             let monitorTimer = null;
+            let updateBusy = false;
+            let silentCheckPromise = null;
             if (!desktop) {
                 if (tools) tools.style.display = 'none';
                 const loginModal = document.getElementById('loginModal');
@@ -4081,7 +4083,13 @@
                 notice.classList.add('active');
             }
             async function checkUpdateSilently() {
-                try { const role = await currentRole(); if (role) showUpdateNotice(await desktop.check()); } catch { /* الإشعار لا يعطل البرنامج */ }
+                if (silentCheckPromise) return silentCheckPromise;
+                silentCheckPromise = (async () => {
+                    try { const role = await currentRole(); if (role && !updateBusy) showUpdateNotice(await desktop.check()); }
+                    catch { /* الإشعار لا يعطل البرنامج */ }
+                    finally { silentCheckPromise = null; }
+                })();
+                return silentCheckPromise;
             }
             window.openUpdateFromNotice = function () { checkForAppUpdate(); };
             window.dismissUpdateNotice = async function () {
@@ -4288,8 +4296,12 @@
                 finally { if (button) button.disabled = false; }
             };
             window.checkForAppUpdate = async function () {
+                if (updateBusy) return;
+                if (silentCheckPromise) await silentCheckPromise.catch(() => {});
+                if (updateBusy) return;
                 const role = await currentRole();
                 if (!role) { openLoginPanel(); return; }
+                updateBusy = true;
                 const button = document.getElementById('checkUpdateBtn');
                 if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جارٍ الفحص...'; }
                 try {
