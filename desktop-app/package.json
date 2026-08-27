@@ -28,6 +28,10 @@
     "directories": {
       "output": "dist"
     },
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/altykyy-gif/timetable-update-server/releases/latest/download/"
+    },
     "win": {
       "target": [
         "portable",
