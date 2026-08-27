@@ -42,9 +42,18 @@ function compareVersions(a, b) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, { cache: 'no-store', ...options, headers: { Accept: 'application/json', ...(options.headers || {}) } });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(url, { cache: 'no-store', ...options, signal: controller.signal, headers: { Accept: 'application/json', ...(options.headers || {}) } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('تعذر الاتصال بالخادم خلال 20 ثانية. تحقق من اتصال الإنترنت وحاول مرة أخرى.');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function requireOwnerSession() {

@@ -1,6 +1,6 @@
 {
   "name": "timetable-windows-app",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "تطبيق جدول الحصص المدرسية مع تحديثات عن بعد ولوحة مالك",
   "main": "main.js",
   "author": "الأستاذ يحيى التيغي",
