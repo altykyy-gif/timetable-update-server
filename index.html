@@ -481,6 +481,26 @@
         .desktop-owner-note { background: #f8f2e7; border-right: 4px solid var(--gold); padding: 10px 13px; border-radius: 5px; margin-bottom: 14px; color: #4e514e; font-size: .84rem; line-height: 1.65; }
         .desktop-update-status { min-height: 25px; margin-top: 10px; color: #42677a; font-weight: 700; font-size: .84rem; }
         @media (max-width: 900px) { .desktop-update-tools { display: none; } }
+        .update-notification { display: none; margin: 0.85rem 2.25rem 0; padding: 0.75rem 1rem; background: #fff8e8; border: 1px solid var(--gold-border); border-right: 4px solid var(--gold); border-radius: 6px; color: #5a461d; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow); }
+        .update-notification.active { display: flex; }
+        .update-notification-text { flex: 1; font-weight: 700; font-size: .86rem; line-height: 1.55; }
+        .update-notification-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+        .server-monitor-card { background: #f8faf9; border: 1px solid #cbded5; border-right: 4px solid var(--success); border-radius: 6px; padding: 13px; margin-bottom: 14px; }
+        .server-monitor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 10px 0; }
+        .server-monitor-item { background: #fffefa; border: 1px solid #dbe7e1; border-radius: 5px; padding: 8px 10px; }
+        .server-monitor-label { display: block; color: #66756e; font-size: .72rem; font-weight: 700; }
+        .server-monitor-value { display: block; color: var(--primary-navy); font-size: 1.05rem; font-weight: 800; margin-top: 2px; }
+        .preview-modal-card { max-width: 1200px; width: 96%; max-height: 94vh; }
+        #printPreviewContent { background: #eef1ef; padding: 14px; max-height: 70vh; overflow: auto; }
+        #printPreviewContent .official-doc-sheet { margin-bottom: 14px; }
+        #bulkPrintContainer { display: none; }
+        @media print {
+            #bulkPrintContainer { display: none !important; }
+            #printPreviewModal { display: block !important; position: static !important; background: #fff !important; padding: 0 !important; }
+            #printPreviewModal .modal-card { width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+            #printPreviewModal .modal-header, #printPreviewModal .preview-actions { display: none !important; }
+            #printPreviewContent { display: block !important; max-height: none !important; overflow: visible !important; padding: 0 !important; background: #fff !important; }
+        }
 
     </style>
 </head>
@@ -529,6 +549,14 @@
             </div>
         </div>
     </header>
+
+    <div class="update-notification no-print" id="updateNotification" role="status" aria-live="polite">
+        <div class="update-notification-text" id="updateNotificationText"></div>
+        <div class="update-notification-actions">
+            <button type="button" class="btn btn-gold btn-sm" onclick="openUpdateFromNotice()"><i class="fa-solid fa-download"></i> عرض التحديث</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="dismissUpdateNotice()">لاحقًا</button>
+        </div>
+    </div>
 
     <div class="app-container">
         <aside class="sidebar">
@@ -1268,6 +1296,19 @@
         </main>
     </div>
 
+    <div class="modal-overlay" id="printPreviewModal" role="dialog" aria-modal="true" aria-labelledby="printPreviewTitle">
+        <div class="modal-card preview-modal-card">
+            <div class="modal-header">
+                <h3 class="card-title" id="printPreviewTitle"><i class="fa-solid fa-eye"></i> معاينة التقرير قبل الطباعة</h3>
+                <div class="preview-actions" style="display:flex; gap:7px;">
+                    <button type="button" class="btn btn-gold btn-sm" onclick="printCurrentPreview()"><i class="fa-solid fa-print"></i> طباعة</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="closePrintPreview()">إغلاق</button>
+                </div>
+            </div>
+            <div id="printPreviewContent"></div>
+        </div>
+    </div>
+
     <!-- نافذة تعديل بيانات المعلم والحصص اليومية -->
     <div class="modal-overlay" id="editTeacherModal">
         <div class="modal-card" style="max-width:550px;">
@@ -1341,6 +1382,7 @@
         // دالة مساعدة آمنة: تضمن اكتمال تحميل الخط المختار (مثل خط الرقعة) فعلياً في المتصفح
         // قبل تنفيذ أمر الطباعة، لتفادي ظهور الجداول بخط بديل بسبب طباعتها قبل اكتمال تحميل الخط
         function printWhenFontsReady() {
+            const open = () => openPrintPreview();
             try {
                 const fontStack = getComputedStyle(document.documentElement).getPropertyValue('--report-font-family') || "'Aref Ruqaa', serif";
                 if (document.fonts && document.fonts.load) {
@@ -1348,13 +1390,37 @@
                         document.fonts.load(`700 16px ${fontStack}`),
                         document.fonts.load(`400 16px ${fontStack}`),
                         document.fonts.ready
-                    ]).finally(() => window.print());
+                    ]).finally(open);
                 } else {
-                    window.print();
+                    open();
                 }
             } catch (e) {
-                window.print();
+                open();
             }
+        }
+
+        function openPrintPreview() {
+            const source = document.getElementById('bulkPrintContainer');
+            const target = document.getElementById('printPreviewContent');
+            const modal = document.getElementById('printPreviewModal');
+            if (!source || !target || !source.innerHTML.trim()) { alert('لا يوجد تقرير جاهز للمعاينة.'); return; }
+            target.innerHTML = source.innerHTML;
+            if (modal) modal.classList.add('active');
+        }
+
+        function closePrintPreview() {
+            const modal = document.getElementById('printPreviewModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function printCurrentPreview() {
+            const modal = document.getElementById('printPreviewModal');
+            if (!modal || !modal.classList.contains('active')) return;
+            const fontStack = getComputedStyle(document.documentElement).getPropertyValue('--report-font-family') || "'Aref Ruqaa', serif";
+            const doPrint = () => window.print();
+            if (document.fonts && document.fonts.load) {
+                Promise.all([document.fonts.load(`700 16px ${fontStack}`), document.fonts.load(`400 16px ${fontStack}`), document.fonts.ready]).finally(doPrint);
+            } else doPrint();
         }
 
         const SAVED_INITIAL_DATA = {
@@ -3194,9 +3260,10 @@
 
             let minDailyViolations = [];
             let maxDailyViolations = [];
+            const scopedClassIds = new Set(appData.classes.filter(c => c.grade === gradeScope).map(c => c.id));
 
             appData.teachers.forEach(t => {
-                const teacherLessons = appData.timetable.filter(s => s.teacherId === t.id);
+                const teacherLessons = appData.timetable.filter(s => s.teacherId === t.id && scopedClassIds.has(s.classId));
                 if (teacherLessons.length === 0) return;
 
                 for (let d = 0; d < daysCount; d++) {
@@ -3777,6 +3844,18 @@
                 <button type="button" class="btn btn-outline btn-sm" onclick="closeOwnerPanel()" aria-label="إغلاق">إغلاق</button>
             </div>
             <div class="desktop-owner-note">تم التحقق من صلاحية المالك على الخادم. عدّل الكود عند الحاجة، ثم انشر رقم إصدار أعلى. جلسة المالك مؤقتة وتنتهي تلقائيًا.</div>
+            <div class="server-monitor-card">
+                <div class="card-title" style="font-size:0.98rem; margin-bottom:5px;"><i class="fa-solid fa-server" style="color:var(--success);"></i> مراقبة الخادم والمتصلين</div>
+                <div class="desktop-owner-note" style="margin-bottom:8px;">العداد تقريبي ويعتمد على آخر نبضة اتصال من التطبيقات خلال 90 ثانية. لا تُعرض كلمات المرور أو رموز الجلسات.</div>
+                <div class="server-monitor-grid">
+                    <div class="server-monitor-item"><span class="server-monitor-label">حالة الخادم</span><span class="server-monitor-value" id="serverStatusValue">غير مفحوص</span></div>
+                    <div class="server-monitor-item"><span class="server-monitor-label">المتصلون الآن</span><span class="server-monitor-value" id="serverConnectionsValue">—</span></div>
+                    <div class="server-monitor-item"><span class="server-monitor-label">الإصدار المنشور</span><span class="server-monitor-value" id="serverVersionValue">—</span></div>
+                    <div class="server-monitor-item"><span class="server-monitor-label">مدة التشغيل</span><span class="server-monitor-value" id="serverUptimeValue">—</span></div>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="refreshServerStatus()"><i class="fa-solid fa-rotate"></i> تحديث بيانات الخادم</button>
+                <div class="desktop-update-status" id="serverStatusMessage"></div>
+            </div>
             <div class="card" style="background:#fbfaf6; border:1px solid var(--gold-border); padding:14px; margin-bottom:14px;">
                 <div class="card-title" style="font-size:0.98rem; margin-bottom:8px;"><i class="fa-solid fa-key" style="color:var(--gold);"></i> تغيير كلمات المرور</div>
                 <div class="desktop-owner-note" style="margin-bottom:10px;">يجب إدخال كلمة مرور المالك الحالية. كلمة المرور الجديدة لا تقل عن 8 أحرف. في الخطة المجانية قد يعود التغيير إلى القيمة الموجودة في Render بعد إعادة تشغيل الخدمة أو إعادة نشرها.</div>
@@ -3809,7 +3888,41 @@
         (function installAuthUi() {
             const desktop = window.desktopUpdates;
             const tools = document.getElementById('desktopUpdateTools');
+            let heartbeatTimer = null;
+            let monitorTimer = null;
             if (!desktop) { if (tools) tools.style.display = 'none'; return; }
+
+            function formatUptime(seconds) {
+                const total = Number(seconds || 0);
+                const hours = Math.floor(total / 3600);
+                const minutes = Math.floor((total % 3600) / 60);
+                return `${hours}س ${minutes}د`;
+            }
+            function startPresence() {
+                if (heartbeatTimer) clearInterval(heartbeatTimer);
+                const beat = () => desktop.heartbeat().catch(() => {});
+                beat();
+                heartbeatTimer = setInterval(beat, 30000);
+            }
+            function stopPresence() { if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; } }
+            function showUpdateNotice(result) {
+                const notice = document.getElementById('updateNotification');
+                const text = document.getElementById('updateNotificationText');
+                if (!notice || !text) return;
+                if (!result || !result.hasUpdate) { notice.classList.remove('active'); return; }
+                const dismissed = localStorage.getItem('dismissed_update_version') === result.latestVersion;
+                if (dismissed) return;
+                text.textContent = `يتوفر تحديث جديد للمنظومة: الإصدار ${result.latestVersion}. ${result.notes || 'اضغط عرض التحديث لمراجعته وتثبيته.'}`;
+                notice.classList.add('active');
+            }
+            async function checkUpdateSilently() {
+                try { const role = await currentRole(); if (role) showUpdateNotice(await desktop.check()); } catch { /* الإشعار لا يعطل البرنامج */ }
+            }
+            window.openUpdateFromNotice = function () { checkForAppUpdate(); };
+            window.dismissUpdateNotice = async function () {
+                try { const result = await desktop.check(); if (result.latestVersion) localStorage.setItem('dismissed_update_version', result.latestVersion); } catch {}
+                const notice = document.getElementById('updateNotification'); if (notice) notice.classList.remove('active');
+            };
 
             function setStatus(id, message) { const el = document.getElementById(id); if (el) el.textContent = message || ''; }
             function currentRole() { return desktop.role(); }
@@ -3841,6 +3954,8 @@
                 try {
                     const result = await desktop.login({ role, password });
                     applyAuthUi(result.role);
+                    startPresence();
+                    checkUpdateSilently();
                     setStatus('loginStatus', 'تم تسجيل الدخول بنجاح.');
                 } catch (error) {
                     applyAuthUi(null);
@@ -3849,7 +3964,9 @@
             };
             window.logoutApp = async function () {
                 await desktop.logout();
+                stopPresence();
                 applyAuthUi(null);
+                const notice = document.getElementById('updateNotification'); if (notice) notice.classList.remove('active');
                 setStatus('loginStatus', 'تم تسجيل الخروج.');
             };
             window.openOwnerPanel = async function () {
@@ -3857,8 +3974,26 @@
                 const modal = document.getElementById('ownerModal');
                 if (modal) modal.classList.add('active');
                 setStatus('ownerStatus', 'اضغط «تحميل الكود الحالي» لبدء التعديل.');
+                refreshServerStatus();
+                if (monitorTimer) clearInterval(monitorTimer);
+                monitorTimer = setInterval(refreshServerStatus, 15000);
             };
-            window.closeOwnerPanel = function () { const modal = document.getElementById('ownerModal'); if (modal) modal.classList.remove('active'); };
+            window.closeOwnerPanel = function () { const modal = document.getElementById('ownerModal'); if (modal) modal.classList.remove('active'); if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; } };
+            window.refreshServerStatus = async function () {
+                if (await currentRole() !== 'owner') return;
+                try {
+                    setStatus('serverStatusMessage', 'جارٍ قراءة حالة الخادم...');
+                    const result = await desktop.serverStatus();
+                    document.getElementById('serverStatusValue').textContent = result.status === 'online' ? 'متصل' : (result.status || 'غير معروف');
+                    document.getElementById('serverConnectionsValue').textContent = String(result.activeConnections ?? 0);
+                    document.getElementById('serverVersionValue').textContent = result.latestVersion || '—';
+                    document.getElementById('serverUptimeValue').textContent = formatUptime(result.uptimeSeconds);
+                    setStatus('serverStatusMessage', `آخر فحص: ${new Date(result.serverTime).toLocaleTimeString('ar')}`);
+                } catch (error) {
+                    document.getElementById('serverStatusValue').textContent = 'تعذر الاتصال';
+                    setStatus('serverStatusMessage', error.message || 'تعذر قراءة حالة الخادم.');
+                }
+            };
             window.loadOwnerSource = async function () {
                 try { setStatus('ownerStatus', 'جارٍ تحميل الكود الحالي...'); document.getElementById('ownerSource').value = await desktop.readSource(); setStatus('ownerStatus', 'تم تحميل الكود. عدّله ثم اكتب رقم إصدار أعلى وانشره.'); }
                 catch (error) { setStatus('ownerStatus', error.message || 'تعذر تحميل الكود.'); }
@@ -3913,7 +4048,7 @@
                 } catch (error) { const message = error.message || String(error); if (desktop.showError) desktop.showError(message); else alert(`تعذر التحديث: ${message}`); }
                 finally { if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> تحديث'; } }
             };
-            window.addEventListener('DOMContentLoaded', async () => { try { applyAuthUi(await currentRole()); } catch { applyAuthUi(null); } });
+            window.addEventListener('DOMContentLoaded', async () => { try { const role = await currentRole(); applyAuthUi(role); if (role) { startPresence(); checkUpdateSilently(); } } catch { applyAuthUi(null); } });
         })();
     </script>
 

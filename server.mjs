@@ -15,6 +15,9 @@ let USER_PASSWORD = process.env.USER_PASSWORD || '';
 const MAX_BODY = 12 * 1024 * 1024;
 const SESSION_TTL = 8 * 60 * 60 * 1000;
 const sessions = new Map();
+const activeClients = new Map();
+const HEARTBEAT_TTL = 90 * 1000;
+const serverStartedAt = Date.now();
 
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, {
@@ -33,16 +36,16 @@ async function ensureData() {
   const sourceHtml = path.join(__dirname, 'index.html');
   if (!existsSync(HTML_PATH)) await fs.copyFile(sourceHtml, HTML_PATH);
   if (!existsSync(MANIFEST_PATH)) {
-    await writeManifest('1.1.0', 'إضافة تسجيل الدخول والصلاحيات', 'الإصدار الذي يحتوي على حساب المالك والمستخدم');
+    await writeManifest('1.2.0', 'إشعارات التحديث ومراقبة الخادم ومعاينة الطباعة وإصلاح عزل الملاحظات', 'الإصدار الذي يحتوي على الميزات الجديدة والإصلاحات المطلوبة');
     return;
   }
   try {
     const currentManifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8'));
     const currentHtml = await fs.readFile(HTML_PATH, 'utf8');
     const source = await fs.readFile(sourceHtml, 'utf8');
-    if (currentManifest.version === '1.0.0' && source.includes('loginModal') && !currentHtml.includes('loginModal')) {
+    if ((currentManifest.version === '1.0.0' || currentManifest.version === '1.1.0') && source.includes('updateNotification') && !currentHtml.includes('updateNotification')) {
       await fs.copyFile(sourceHtml, HTML_PATH);
-      await writeManifest('1.1.0', 'إضافة تسجيل الدخول والصلاحيات', 'الإصدار الذي يحتوي على حساب المالك والمستخدم');
+      await writeManifest('1.2.0', 'إشعارات التحديث ومراقبة الخادم ومعاينة الطباعة وإصلاح عزل الملاحظات', 'الإصدار الذي يحتوي على الميزات الجديدة والإصلاحات المطلوبة');
     }
   } catch (error) {
     console.error('Could not migrate the initial manifest:', error.message);
@@ -85,6 +88,16 @@ function invalidateRoleSessions(role = null) {
     if (!role || session.role === role) sessions.delete(token);
   }
 }
+function cleanupActiveClients() {
+  const cutoff = Date.now() - HEARTBEAT_TTL;
+  for (const [token, client] of activeClients.entries()) {
+    if (client.lastSeenAt < cutoff || !sessions.has(token)) activeClients.delete(token);
+  }
+}
+function activeClientSummary() {
+  cleanupActiveClients();
+  return [...activeClients.values()].map(client => ({ role: client.role, lastSeenAt: new Date(client.lastSeenAt).toISOString() }));
+}
 function issueToken(role) {
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, { role, expiresAt: Date.now() + SESSION_TTL });
@@ -116,6 +129,28 @@ const server = http.createServer(async (req, res) => {
       if (!expected) return send(res, 503, { error: `لم يتم إعداد كلمة مرور حساب ${role === 'owner' ? 'المالك' : 'المستخدم'} في الخادم.` });
       if (!safeEqual(password, expected)) return send(res, 401, { error: 'بيانات تسجيل الدخول غير صحيحة.' });
       return send(res, 200, { ok: true, role, token: issueToken(role), expiresIn: SESSION_TTL / 1000 });
+    }
+    if (req.method === 'POST' && req.url === '/api/heartbeat') {
+      const session = sessionFrom(req);
+      if (!session) return send(res, 401, { error: 'جلسة تسجيل الدخول غير صالحة.' });
+      activeClients.set(session.token, { role: session.role, lastSeenAt: Date.now() });
+      return send(res, 200, { ok: true, serverTime: new Date().toISOString(), activeConnections: activeClients.size });
+    }
+    if (req.method === 'GET' && req.url === '/api/status') {
+      const session = sessionFrom(req);
+      if (!session || session.role !== 'owner') return send(res, 401, { error: 'تسجيل دخول المالك مطلوب.' });
+      const manifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8'));
+      const clients = activeClientSummary();
+      return send(res, 200, {
+        ok: true,
+        status: 'online',
+        serverTime: new Date().toISOString(),
+        uptimeSeconds: Math.floor((Date.now() - serverStartedAt) / 1000),
+        activeConnections: clients.length,
+        activeClients: clients,
+        latestVersion: manifest.version,
+        publishedAt: manifest.publishedAt || ''
+      });
     }
     if (req.method === 'GET' && req.url === '/manifest.json') return send(res, 200, await fs.readFile(MANIFEST_PATH, 'utf8'));
     if (req.method === 'POST' && req.url === '/api/password/change') {
