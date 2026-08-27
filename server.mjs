@@ -10,8 +10,8 @@ const DATA_DIR = path.join(__dirname, 'published');
 const HTML_PATH = path.join(DATA_DIR, 'index.html');
 const MANIFEST_PATH = path.join(DATA_DIR, 'manifest.json');
 const PORT = Number(process.env.PORT || 8787);
-const OWNER_PASSWORD = process.env.OWNER_PASSWORD || '';
-const USER_PASSWORD = process.env.USER_PASSWORD || '';
+let OWNER_PASSWORD = process.env.OWNER_PASSWORD || '';
+let USER_PASSWORD = process.env.USER_PASSWORD || '';
 const MAX_BODY = 12 * 1024 * 1024;
 const SESSION_TTL = 8 * 60 * 60 * 1000;
 const sessions = new Map();
@@ -79,6 +79,12 @@ function readBody(req) {
 function validVersion(version) { return /^\d+\.\d+\.\d+$/.test(String(version || '')); }
 function digest(value) { return crypto.createHash('sha256').update(String(value || '')).digest(); }
 function safeEqual(a, b) { const da = digest(a); const db = digest(b); return crypto.timingSafeEqual(da, db); }
+function passwordIsAcceptable(value) { return typeof value === 'string' && value.length >= 8 && value.length <= 256; }
+function invalidateRoleSessions(role = null) {
+  for (const [token, session] of sessions.entries()) {
+    if (!role || session.role === role) sessions.delete(token);
+  }
+}
 function issueToken(role) {
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, { role, expiresAt: Date.now() + SESSION_TTL });
@@ -112,6 +118,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, role, token: issueToken(role), expiresIn: SESSION_TTL / 1000 });
     }
     if (req.method === 'GET' && req.url === '/manifest.json') return send(res, 200, await fs.readFile(MANIFEST_PATH, 'utf8'));
+    if (req.method === 'POST' && req.url === '/api/password/change') {
+      const session = sessionFrom(req);
+      if (!session || session.role !== 'owner') return send(res, 401, { error: 'تسجيل دخول المالك مطلوب.' });
+      const body = await readBody(req);
+      const targetRole = body.targetRole === 'owner' ? 'owner' : body.targetRole === 'user' ? 'user' : '';
+      const currentPassword = String(body.currentPassword || '');
+      const newPassword = String(body.newPassword || '');
+      const confirmPassword = String(body.confirmPassword || '');
+      if (!targetRole || !currentPassword || !newPassword || !confirmPassword) return send(res, 400, { error: 'أكمل جميع حقول تغيير كلمة المرور.' });
+      if (!safeEqual(currentPassword, OWNER_PASSWORD)) return send(res, 401, { error: 'كلمة مرور المالك الحالية غير صحيحة.' });
+      if (!passwordIsAcceptable(newPassword)) return send(res, 400, { error: 'يجب أن تكون كلمة المرور الجديدة بين 8 و256 حرفًا.' });
+      if (newPassword !== confirmPassword) return send(res, 400, { error: 'تأكيد كلمة المرور الجديدة غير مطابق.' });
+      if (targetRole === 'owner') {
+        OWNER_PASSWORD = newPassword;
+        invalidateRoleSessions();
+        return send(res, 200, { ok: true, targetRole, ownerPasswordChanged: true, message: 'تم تغيير كلمة مرور المالك. سجّل الدخول من جديد.' });
+      }
+      USER_PASSWORD = newPassword;
+      invalidateRoleSessions('user');
+      return send(res, 200, { ok: true, targetRole, ownerPasswordChanged: false, message: 'تم تغيير كلمة مرور المستخدم بنجاح.' });
+    }
     if (req.method === 'GET' && req.url === '/published/index.html') return send(res, 200, await fs.readFile(HTML_PATH, 'utf8'), 'text/html; charset=utf-8');
     if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true });
     if (req.method === 'POST' && req.url === '/api/publish') {

@@ -3777,6 +3777,20 @@
                 <button type="button" class="btn btn-outline btn-sm" onclick="closeOwnerPanel()" aria-label="إغلاق">إغلاق</button>
             </div>
             <div class="desktop-owner-note">تم التحقق من صلاحية المالك على الخادم. عدّل الكود عند الحاجة، ثم انشر رقم إصدار أعلى. جلسة المالك مؤقتة وتنتهي تلقائيًا.</div>
+            <div class="card" style="background:#fbfaf6; border:1px solid var(--gold-border); padding:14px; margin-bottom:14px;">
+                <div class="card-title" style="font-size:0.98rem; margin-bottom:8px;"><i class="fa-solid fa-key" style="color:var(--gold);"></i> تغيير كلمات المرور</div>
+                <div class="desktop-owner-note" style="margin-bottom:10px;">يجب إدخال كلمة مرور المالك الحالية. كلمة المرور الجديدة لا تقل عن 8 أحرف. في الخطة المجانية قد يعود التغيير إلى القيمة الموجودة في Render بعد إعادة تشغيل الخدمة أو إعادة نشرها.</div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group"><label for="passwordTargetRole">الحساب المراد تغيير كلمته</label><select id="passwordTargetRole" class="form-control"><option value="user">المستخدم</option><option value="owner">المالك</option></select></div>
+                    <div class="form-group"><label for="passwordCurrent">كلمة مرور المالك الحالية</label><input id="passwordCurrent" class="form-control" type="password" autocomplete="current-password"></div>
+                </div>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group"><label for="passwordNew">كلمة المرور الجديدة</label><input id="passwordNew" class="form-control" type="password" autocomplete="new-password" minlength="8"></div>
+                    <div class="form-group"><label for="passwordConfirm">تأكيد كلمة المرور الجديدة</label><input id="passwordConfirm" class="form-control" type="password" autocomplete="new-password" minlength="8"></div>
+                </div>
+                <button type="button" class="btn btn-gold" onclick="changeAuthPassword()"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button>
+                <div class="desktop-update-status" id="passwordStatus"></div>
+            </div>
             <div class="form-row">
                 <div class="form-group"><label for="ownerVersion">رقم الإصدار الجديد</label><input id="ownerVersion" class="form-control" type="text" value="1.0.1" placeholder="مثال: 1.0.1"></div>
                 <div class="form-group"><label for="ownerNotes">ملاحظات الإصدار</label><input id="ownerNotes" class="form-control" type="text" placeholder="إصلاح مشكلة الطباعة مثلًا"></div>
@@ -3859,6 +3873,28 @@
                 if (!confirm(`سيتم نشر الإصدار ${version} لجميع المستخدمين. متابعة؟`)) return;
                 try { setStatus('ownerStatus', 'جارٍ رفع النسخة والتحقق منها...'); const result = await desktop.publishSource({ version, notes, html: source }); setStatus('ownerStatus', result.message || 'تم نشر الإصدار بنجاح.'); alert(result.message || 'تم نشر الإصدار بنجاح.'); }
                 catch (error) { setStatus('ownerStatus', `فشل النشر: ${error.message || error}`); }
+            };
+            window.changeAuthPassword = async function () {
+                if (await currentRole() !== 'owner') { closeOwnerPanel(); openLoginPanel(); return; }
+                const targetRole = document.getElementById('passwordTargetRole').value;
+                const currentPassword = document.getElementById('passwordCurrent').value;
+                const newPassword = document.getElementById('passwordNew').value;
+                const confirmPassword = document.getElementById('passwordConfirm').value;
+                if (!currentPassword || !newPassword || !confirmPassword) { setStatus('passwordStatus', 'أكمل جميع حقول تغيير كلمة المرور.'); return; }
+                if (newPassword.length < 8) { setStatus('passwordStatus', 'يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل.'); return; }
+                if (newPassword !== confirmPassword) { setStatus('passwordStatus', 'تأكيد كلمة المرور الجديدة غير مطابق.'); return; }
+                const targetLabel = targetRole === 'owner' ? 'المالك' : 'المستخدم';
+                if (!confirm(`سيتم تغيير كلمة مرور حساب ${targetLabel}. متابعة؟`)) return;
+                const button = document.querySelector('[onclick="changeAuthPassword()"]');
+                if (button) button.disabled = true;
+                setStatus('passwordStatus', 'جارٍ تغيير كلمة المرور...');
+                try {
+                    const result = await desktop.changePassword({ targetRole, currentPassword, newPassword, confirmPassword });
+                    ['passwordCurrent', 'passwordNew', 'passwordConfirm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+                    if (result.ownerPasswordChanged) { await desktop.logout(); applyAuthUi(null); closeOwnerPanel(); setStatus('loginStatus', result.message || 'تم تغيير كلمة مرور المالك. سجّل الدخول من جديد.'); }
+                    else setStatus('passwordStatus', result.message || 'تم تغيير كلمة مرور المستخدم بنجاح.');
+                } catch (error) { setStatus('passwordStatus', error.message || 'تعذر تغيير كلمة المرور.'); }
+                finally { if (button) button.disabled = false; }
             };
             window.checkForAppUpdate = async function () {
                 const role = await currentRole();
