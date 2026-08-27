@@ -42,17 +42,16 @@ async function ensureData() {
   const sourceHtml = path.join(__dirname, 'index.html');
   if (!existsSync(HTML_PATH)) await fs.copyFile(sourceHtml, HTML_PATH);
   if (!existsSync(MANIFEST_PATH)) {
-    await writeManifest('1.4.0', 'قاعدة رسائل PostgreSQL والردود وتحديث EXE التلقائي وإصلاح خانات التواصل', 'إضافة الرسائل الدائمة والرد المباشر وتحديث التطبيق التنفيذي عبر latest.yml.');
+    await writeManifest('1.4.3', 'إضافة خط سلطان ميديا وتصفية تقارير المعلمين حسب الصف وخيار جميع الصفوف.', 'تحديث آمن للتقارير دون تغيير خوارزمية توليد الجداول أو بيانات المستخدم.');
   }
   if (!existsSync(MESSAGES_PATH)) await fs.writeFile(MESSAGES_PATH, '[]', 'utf8');
   if (!existsSync(MANIFEST_PATH)) return;
   try {
     const currentManifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8'));
-    const currentHtml = await fs.readFile(HTML_PATH, 'utf8');
     const source = await fs.readFile(sourceHtml, 'utf8');
-    if (currentManifest.version !== '1.4.0' && source.includes('id="contact"')) {
+    if (validVersion(currentManifest.version) && compareVersions(currentManifest.version, '1.4.3') < 0 && source.includes('id="printGradeFilter"') && source.includes('Sultan Medium')) {
       await fs.copyFile(sourceHtml, HTML_PATH);
-      await writeManifest('1.4.0', 'قاعدة رسائل PostgreSQL والردود وتحديث EXE التلقائي وإصلاح خانات التواصل', 'إضافة الرسائل الدائمة والرد المباشر وتحديث التطبيق التنفيذي عبر latest.yml.');
+      await writeManifest('1.4.3', 'إضافة خط سلطان ميديا وتصفية تقارير المعلمين حسب الصف وخيار جميع الصفوف.', 'تحديث آمن للتقارير دون تغيير خوارزمية توليد الجداول أو بيانات المستخدم.');
     }
   } catch (error) {
     console.error('Could not migrate the initial manifest:', error.message);
@@ -172,6 +171,16 @@ async function readBody(req) {
 }
 
 function validVersion(version) { return /^\d+\.\d+\.\d+$/.test(String(version || '')); }
+function compareVersions(a, b) {
+  const pa = String(a || '0.0.0').split('.').map(Number);
+  const pb = String(b || '0.0.0').split('.').map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const av = Number.isFinite(pa[i]) ? pa[i] : 0;
+    const bv = Number.isFinite(pb[i]) ? pb[i] : 0;
+    if (av !== bv) return av > bv ? 1 : -1;
+  }
+  return 0;
+}
 function digest(value) { return crypto.createHash('sha256').update(String(value || '')).digest(); }
 function safeEqual(a, b) { const da = digest(a); const db = digest(b); return crypto.timingSafeEqual(da, db); }
 function passwordIsAcceptable(value) { return typeof value === 'string' && value.length >= 8 && value.length <= 256; }

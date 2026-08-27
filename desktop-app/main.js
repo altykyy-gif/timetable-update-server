@@ -7,6 +7,7 @@ const { existsSync } = require('node:fs');
 const APP_DIR = path.join(__dirname, 'app');
 const USER_APP_DIR = path.join(app.getPath('userData'), 'published');
 const CURRENT_HTML = path.join(USER_APP_DIR, 'index.html');
+const BUNDLED_HTML = path.join(APP_DIR, 'index.html');
 const INSTALLED_VERSION_PATH = path.join(USER_APP_DIR, 'version.txt');
 const CONFIG_PATH = path.join(__dirname, 'update-config.json');
 
@@ -16,8 +17,18 @@ let exeUpdateState = { configured: false, available: false, downloaded: false, v
 
 async function ensureCurrentHtml() {
   await fs.mkdir(USER_APP_DIR, { recursive: true });
-  if (!existsSync(CURRENT_HTML)) await fs.copyFile(path.join(APP_DIR, 'index.html'), CURRENT_HTML);
-  if (!existsSync(INSTALLED_VERSION_PATH)) await fs.writeFile(INSTALLED_VERSION_PATH, app.getVersion(), 'utf8');
+  const hasCurrentHtml = existsSync(CURRENT_HTML);
+  const hasInstalledVersion = existsSync(INSTALLED_VERSION_PATH);
+  let installedVersion = '';
+  if (hasInstalledVersion) {
+    try { installedVersion = (await fs.readFile(INSTALLED_VERSION_PATH, 'utf8')).trim(); } catch {}
+  }
+  const packagedVersion = app.getVersion();
+  const shouldSyncBundledHtml = !hasCurrentHtml || !hasInstalledVersion || !installedVersion || compareVersions(packagedVersion, installedVersion) > 0;
+  if (shouldSyncBundledHtml) await fs.copyFile(BUNDLED_HTML, CURRENT_HTML);
+  if (!hasInstalledVersion || !installedVersion || compareVersions(packagedVersion, installedVersion) > 0) {
+    await fs.writeFile(INSTALLED_VERSION_PATH, packagedVersion, 'utf8');
+  }
 }
 
 async function getInstalledVersion() {
