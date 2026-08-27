@@ -30,8 +30,23 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
 
 async function ensureData() {
   await fs.mkdir(DATA_DIR, { recursive: true });
-  if (!existsSync(HTML_PATH)) await fs.copyFile(path.join(__dirname, 'index.html'), HTML_PATH);
-  if (!existsSync(MANIFEST_PATH)) await writeManifest('1.0.0', 'الإصدار الأساسي', 'نسخة البداية');
+  const sourceHtml = path.join(__dirname, 'index.html');
+  if (!existsSync(HTML_PATH)) await fs.copyFile(sourceHtml, HTML_PATH);
+  if (!existsSync(MANIFEST_PATH)) {
+    await writeManifest('1.1.0', 'إضافة تسجيل الدخول والصلاحيات', 'الإصدار الذي يحتوي على حساب المالك والمستخدم');
+    return;
+  }
+  try {
+    const currentManifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8'));
+    const currentHtml = await fs.readFile(HTML_PATH, 'utf8');
+    const source = await fs.readFile(sourceHtml, 'utf8');
+    if (currentManifest.version === '1.0.0' && source.includes('loginModal') && !currentHtml.includes('loginModal')) {
+      await fs.copyFile(sourceHtml, HTML_PATH);
+      await writeManifest('1.1.0', 'إضافة تسجيل الدخول والصلاحيات', 'الإصدار الذي يحتوي على حساب المالك والمستخدم');
+    }
+  } catch (error) {
+    console.error('Could not migrate the initial manifest:', error.message);
+  }
 }
 
 async function sha256File(filePath) {
