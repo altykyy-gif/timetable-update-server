@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'published');
 const HTML_PATH = path.join(DATA_DIR, 'index.html');
 const MANIFEST_PATH = path.join(DATA_DIR, 'manifest.json');
+const MESSAGES_PATH = path.join(DATA_DIR, 'contact-messages.json');
 const PORT = Number(process.env.PORT || 8787);
 let OWNER_PASSWORD = process.env.OWNER_PASSWORD || '';
 let USER_PASSWORD = process.env.USER_PASSWORD || '';
@@ -37,15 +38,16 @@ async function ensureData() {
   if (!existsSync(HTML_PATH)) await fs.copyFile(sourceHtml, HTML_PATH);
   if (!existsSync(MANIFEST_PATH)) {
     await writeManifest('1.2.0', 'إشعارات التحديث ومراقبة الخادم ومعاينة الطباعة وإصلاح عزل الملاحظات', 'الإصدار الذي يحتوي على الميزات الجديدة والإصلاحات المطلوبة');
-    return;
   }
+  if (!existsSync(MESSAGES_PATH)) await fs.writeFile(MESSAGES_PATH, '[]', 'utf8');
+  if (!existsSync(MANIFEST_PATH)) return;
   try {
     const currentManifest = JSON.parse(await fs.readFile(MANIFEST_PATH, 'utf8'));
     const currentHtml = await fs.readFile(HTML_PATH, 'utf8');
     const source = await fs.readFile(sourceHtml, 'utf8');
-    if ((currentManifest.version === '1.0.0' || currentManifest.version === '1.1.0') && source.includes('updateNotification') && !currentHtml.includes('updateNotification')) {
+    if (currentManifest.version !== '1.3.0' && source.includes('id="contact"')) {
       await fs.copyFile(sourceHtml, HTML_PATH);
-      await writeManifest('1.2.0', 'إشعارات التحديث ومراقبة الخادم ومعاينة الطباعة وإصلاح عزل الملاحظات', 'الإصدار الذي يحتوي على الميزات الجديدة والإصلاحات المطلوبة');
+      await writeManifest('1.3.0', 'صندوق رسائل المالك وإصلاح تفاعل خانات التواصل', 'إضافة التواصل الداخلي مع المالك وإصلاح عمل خانات الإدخال قبل التحديث.');
     }
   } catch (error) {
     console.error('Could not migrate the initial manifest:', error.message);
@@ -62,7 +64,28 @@ async function writeManifest(version, notes, message = '') {
   return manifest;
 }
 
-function readBody(req) {
+async function readMessages() {
+  try {
+    const value = JSON.parse(await fs.readFile(MESSAGES_PATH, 'utf8'));
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeMessages(messages) {
+  const tempPath = `${MESSAGES_PATH}.tmp`;
+  await fs.writeFile(tempPath, JSON.stringify(messages, null, 2), 'utf8');
+  await fs.rename(tempPath, MESSAGES_PATH);
+}
+
+function cleanMessageValue(value, maxLength) {
+  return String(value || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, maxLength);
+}
+
+function validContactStatus(value) { return ['new', 'read', 'closed'].includes(String(value || '')); }
+
+async function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -151,6 +174,42 @@ const server = http.createServer(async (req, res) => {
         latestVersion: manifest.version,
         publishedAt: manifest.publishedAt || ''
       });
+    }
+    if (req.method === 'POST' && req.url === '/api/contact') {
+      const body = await readBody(req);
+      const type = cleanMessageValue(body.type, 40);
+      const subject = cleanMessageValue(body.subject, 160);
+      const message = cleanMessageValue(body.message, 5000);
+      const name = cleanMessageValue(body.name, 100);
+      const replyEmail = cleanMessageValue(body.replyEmail, 160);
+      const rating = cleanMessageValue(body.rating, 1);
+      if (!type || !subject || !message) return send(res, 400, { error: 'نوع الرسالة والعنوان والنص حقول مطلوبة.' });
+      if (replyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyEmail)) return send(res, 400, { error: 'بريد الرد غير صالح.' });
+      if (rating && !/^[1-5]$/.test(rating)) return send(res, 400, { error: 'التقييم يجب أن يكون من 1 إلى 5.' });
+      const messages = await readMessages();
+      const item = { id: crypto.randomUUID(), type, subject, message, name, replyEmail, rating: rating || null, status: 'new', createdAt: new Date().toISOString() };
+      messages.push(item);
+      await writeMessages(messages.slice(-1000));
+      return send(res, 201, { ok: true, id: item.id, message: 'تم استلام الرسالة.' });
+    }
+    if (req.method === 'GET' && req.url === '/api/contact/messages') {
+      if (!requireOwner(req, res)) return;
+      const messages = await readMessages();
+      return send(res, 200, { ok: true, messages: messages.slice().reverse() });
+    }
+    if (req.method === 'POST' && req.url === '/api/contact/messages/status') {
+      if (!requireOwner(req, res)) return;
+      const body = await readBody(req);
+      const id = cleanMessageValue(body.id, 100);
+      const status = cleanMessageValue(body.status, 20);
+      if (!id || !validContactStatus(status)) return send(res, 400, { error: 'بيانات حالة الرسالة غير صالحة.' });
+      const messages = await readMessages();
+      const item = messages.find(entry => entry.id === id);
+      if (!item) return send(res, 404, { error: 'الرسالة غير موجودة.' });
+      item.status = status;
+      item.updatedAt = new Date().toISOString();
+      await writeMessages(messages);
+      return send(res, 200, { ok: true, message: item });
     }
     if (req.method === 'GET' && req.url === '/manifest.json') return send(res, 200, await fs.readFile(MANIFEST_PATH, 'utf8'));
     if (req.method === 'POST' && req.url === '/api/password/change') {

@@ -502,6 +502,20 @@
             #printPreviewContent { display: block !important; max-height: none !important; overflow: visible !important; padding: 0 !important; background: #fff !important; }
         }
 
+        .contact-card { max-width: 920px; margin: 0 auto; }
+        .contact-helper { background: var(--gold-light); border-right: 4px solid var(--gold); padding: 11px 14px; border-radius: 5px; color: #4e514e; font-size: .86rem; line-height: 1.7; margin-bottom: 16px; }
+        .contact-rating { display: flex; flex-direction: row-reverse; justify-content: flex-end; gap: 6px; }
+        .contact-rating input { position: absolute; opacity: 0; pointer-events: none; }
+        .contact-rating label { cursor: pointer; color: #c8c8c0; font-size: 1.65rem; transition: color .15s ease; }
+        .contact-rating label:hover, .contact-rating label:hover ~ label, .contact-rating input:checked ~ label { color: var(--gold); }
+        .contact-status { min-height: 26px; margin-top: 10px; font-weight: 700; color: var(--accent-blue); line-height: 1.55; }
+        .contact-privacy { color: #68736f; font-size: .77rem; line-height: 1.6; margin-top: 9px; }
+        .contact-inbox-message { border: 1px solid var(--gold-border); border-right: 4px solid var(--gold); border-radius: 6px; padding: 11px 13px; margin-top: 9px; background: #fffdf8; }
+        .contact-inbox-meta { color: #68736f; font-size: .78rem; line-height: 1.6; margin-bottom: 5px; }
+        .contact-inbox-subject { font-weight: 800; color: var(--accent-blue); margin-bottom: 5px; }
+        .contact-inbox-body { white-space: pre-wrap; line-height: 1.7; color: #3e4541; }
+        .contact-inbox-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .contact-inbox-empty { color: #68736f; padding: 10px 0; }
     </style>
 </head>
 <body>
@@ -583,6 +597,9 @@
             </button>
             <button class="nav-btn" onclick="switchTab('print')">
                 <i class="fa-solid fa-print"></i> الطباعة والتقارير
+            </button>
+            <button class="nav-btn" onclick="switchTab('contact')">
+                <i class="fa-solid fa-comments"></i> التواصل والشكاوى والتقييم
             </button>
         </aside>
 
@@ -1291,6 +1308,63 @@
                 </div>
 
                 <div id="bulkPrintContainer"></div>
+            </section>
+
+            <!-- تبويب 9: التواصل والشكاوى والتقييم -->
+            <section id="contact" class="tab-panel">
+                <div class="card contact-card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fa-solid fa-comments" style="color:var(--gold);"></i> التواصل والشكاوى والتقييم</div>
+                    </div>
+                    <div class="contact-helper">
+                        يمكنك إرسال ملاحظة أو شكوى أو اقتراح أو تقييم للمنظومة. سيتم حفظ الرسالة في صندوق رسائل المالك بعد الضغط على زر الإرسال.
+                    </div>
+                    <form id="contactForm" onsubmit="sendContactMessage(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactType">نوع الرسالة</label>
+                                <select id="contactType" class="form-control" required>
+                                    <option value="تواصل عام">تواصل عام</option>
+                                    <option value="شكوى">شكوى</option>
+                                    <option value="اقتراح">اقتراح</option>
+                                    <option value="تقييم">تقييم</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="contactName">الاسم (اختياري)</label>
+                                <input id="contactName" class="form-control" type="text" maxlength="100" placeholder="اكتب اسمك">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="contactSubject">عنوان الرسالة</label>
+                                <input id="contactSubject" class="form-control" type="text" maxlength="160" required placeholder="مثال: مشكلة في تقرير الصف">
+                            </div>
+                            <div class="form-group">
+                                <label for="contactReply">بريدك للرد (اختياري)</label>
+                                <input id="contactReply" class="form-control" type="email" maxlength="160" placeholder="example@email.com">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label for="contactMessage">نص الرسالة</label>
+                            <textarea id="contactMessage" class="form-control" rows="7" maxlength="5000" required placeholder="اكتب تفاصيل الرسالة هنا..."></textarea>
+                        </div>
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label>التقييم (اختياري)</label>
+                            <div class="contact-rating" aria-label="التقييم من نجمة إلى خمس نجوم">
+                                <input id="rating5" type="radio" name="contactRating" value="5"><label for="rating5" title="5 نجوم">★</label>
+                                <input id="rating4" type="radio" name="contactRating" value="4"><label for="rating4" title="4 نجوم">★</label>
+                                <input id="rating3" type="radio" name="contactRating" value="3"><label for="rating3" title="3 نجوم">★</label>
+                                <input id="rating2" type="radio" name="contactRating" value="2"><label for="rating2" title="نجمتان">★</label>
+                                <input id="rating1" type="radio" name="contactRating" value="1"><label for="rating1" title="نجمة واحدة">★</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> إرسال الرسالة</button>
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('contactForm').reset(); document.getElementById('contactStatus').textContent='';">مسح الحقول</button>
+                        <div id="contactStatus" class="contact-status" role="status" aria-live="polite"></div>
+                        <div class="contact-privacy">تُرسل الرسالة إلى الخادم وتحفظ في صندوق رسائل المالك. لا تُحفظ في localStorage ولا تُعرض للمستخدمين الآخرين.</div>
+                    </form>
+                </div>
             </section>
 
         </main>
@@ -2024,6 +2098,33 @@
             if (tabId === 'assignments') { populateAssignmentDropdowns(); renderAssignClassChecklist(); }
             if (tabId === 'generator') { updateGeneratorDropdowns(); populateSwapControls(); renderTimetableView(); }
             if (tabId === 'print') { populatePrintGradeFilter(); }
+        }
+
+        async function sendContactMessage(event) {
+            event.preventDefault();
+            const status = document.getElementById('contactStatus');
+            const form = document.getElementById('contactForm');
+            const payload = {
+                type: document.getElementById('contactType').value,
+                name: document.getElementById('contactName').value.trim(),
+                replyEmail: document.getElementById('contactReply').value.trim(),
+                subject: document.getElementById('contactSubject').value.trim(),
+                message: document.getElementById('contactMessage').value.trim(),
+                rating: document.querySelector('input[name="contactRating"]:checked')?.value || ''
+            };
+            if (!payload.subject || !payload.message) {
+                if (status) status.textContent = 'أدخل عنوان الرسالة ونصها أولًا.';
+                return;
+            }
+            try {
+                if (!window.desktopUpdates?.sendContact) throw new Error('هذه النسخة غير مرتبطة بخادم الرسائل بعد.');
+                if (status) status.textContent = 'جارٍ إرسال الرسالة إلى صندوق المالك...';
+                await window.desktopUpdates.sendContact(payload);
+                form.reset();
+                if (status) status.textContent = 'تم إرسال الرسالة بنجاح. ستظهر في صندوق رسائل المالك.';
+            } catch (error) {
+                if (status) status.textContent = error.message || 'تعذر إرسال الرسالة. تحقق من اتصال الخادم.';
+            }
         }
 
         function saveLocalData() {
@@ -3856,6 +3957,13 @@
                 <button type="button" class="btn btn-outline btn-sm" onclick="refreshServerStatus()"><i class="fa-solid fa-rotate"></i> تحديث بيانات الخادم</button>
                 <div class="desktop-update-status" id="serverStatusMessage"></div>
             </div>
+            <div id="contactInboxCard" class="card" style="background:#fbfaf6; border:1px solid var(--gold-border); padding:14px; margin-bottom:14px;">
+                <div class="card-title" style="font-size:0.98rem; margin-bottom:8px;"><i class="fa-solid fa-inbox" style="color:var(--gold);"></i> صندوق رسائل التواصل</div>
+                <div class="desktop-owner-note" style="margin-bottom:10px;">تظهر هنا الرسائل التي أرسلها المستخدمون. لا تظهر الرسائل إلا بعد تسجيل الدخول بصلاحية المالك.</div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="refreshContactMessages()"><i class="fa-solid fa-rotate"></i> تحديث الرسائل</button>
+                <div class="desktop-update-status" id="contactInboxStatus"></div>
+                <div id="contactMessagesList"><div class="contact-inbox-empty">اضغط «تحديث الرسائل» لعرض الصندوق.</div></div>
+            </div>
             <div class="card" style="background:#fbfaf6; border:1px solid var(--gold-border); padding:14px; margin-bottom:14px;">
                 <div class="card-title" style="font-size:0.98rem; margin-bottom:8px;"><i class="fa-solid fa-key" style="color:var(--gold);"></i> تغيير كلمات المرور</div>
                 <div class="desktop-owner-note" style="margin-bottom:10px;">يجب إدخال كلمة مرور المالك الحالية. كلمة المرور الجديدة لا تقل عن 8 أحرف. في الخطة المجانية قد يعود التغيير إلى القيمة الموجودة في Render بعد إعادة تشغيل الخدمة أو إعادة نشرها.</div>
@@ -3890,7 +3998,12 @@
             const tools = document.getElementById('desktopUpdateTools');
             let heartbeatTimer = null;
             let monitorTimer = null;
-            if (!desktop) { if (tools) tools.style.display = 'none'; return; }
+            if (!desktop) {
+                if (tools) tools.style.display = 'none';
+                const loginModal = document.getElementById('loginModal');
+                if (loginModal) loginModal.classList.remove('active');
+                return;
+            }
 
             function formatUptime(seconds) {
                 const total = Number(seconds || 0);
@@ -3956,6 +4069,7 @@
                     applyAuthUi(result.role);
                     startPresence();
                     checkUpdateSilently();
+                    if (result.role === 'owner') refreshContactMessages();
                     setStatus('loginStatus', 'تم تسجيل الدخول بنجاح.');
                 } catch (error) {
                     applyAuthUi(null);
@@ -3975,10 +4089,74 @@
                 if (modal) modal.classList.add('active');
                 setStatus('ownerStatus', 'اضغط «تحميل الكود الحالي» لبدء التعديل.');
                 refreshServerStatus();
+                refreshContactMessages();
                 if (monitorTimer) clearInterval(monitorTimer);
                 monitorTimer = setInterval(refreshServerStatus, 15000);
             };
             window.closeOwnerPanel = function () { const modal = document.getElementById('ownerModal'); if (modal) modal.classList.remove('active'); if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; } };
+            function renderContactMessages(messages) {
+                const container = document.getElementById('contactMessagesList');
+                if (!container) return;
+                container.textContent = '';
+                if (!Array.isArray(messages) || messages.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'contact-inbox-empty';
+                    empty.textContent = 'لا توجد رسائل جديدة أو محفوظة.';
+                    container.appendChild(empty);
+                    return;
+                }
+                messages.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'contact-inbox-message';
+                    const meta = document.createElement('div');
+                    meta.className = 'contact-inbox-meta';
+                    const date = item.createdAt ? new Date(item.createdAt).toLocaleString('ar') : 'وقت غير معروف';
+                    meta.textContent = `${item.type || 'رسالة'} — ${item.name || 'بدون اسم'} — ${date} — الحالة: ${item.status || 'new'}`;
+                    const subject = document.createElement('div');
+                    subject.className = 'contact-inbox-subject';
+                    subject.textContent = item.subject || 'بدون عنوان';
+                    const body = document.createElement('div');
+                    body.className = 'contact-inbox-body';
+                    body.textContent = `${item.message || ''}${item.replyEmail ? `\\nبريد الرد: ${item.replyEmail}` : ''}${item.rating ? `\\nالتقييم: ${item.rating}/5` : ''}`;
+                    const actions = document.createElement('div');
+                    actions.className = 'contact-inbox-actions';
+                    if (item.status !== 'read') {
+                        const readButton = document.createElement('button');
+                        readButton.type = 'button';
+                        readButton.className = 'btn btn-outline btn-sm';
+                        readButton.textContent = 'تحديد كمقروءة';
+                        readButton.onclick = () => updateContactMessageStatus(item.id, 'read');
+                        actions.appendChild(readButton);
+                    }
+                    if (item.status !== 'closed') {
+                        const closeButton = document.createElement('button');
+                        closeButton.type = 'button';
+                        closeButton.className = 'btn btn-outline btn-sm';
+                        closeButton.textContent = 'إغلاق الرسالة';
+                        closeButton.onclick = () => updateContactMessageStatus(item.id, 'closed');
+                        actions.appendChild(closeButton);
+                    }
+                    card.append(meta, subject, body, actions);
+                    container.appendChild(card);
+                });
+            }
+            window.refreshContactMessages = async function () {
+                if (await currentRole() !== 'owner') return;
+                try {
+                    setStatus('contactInboxStatus', 'جارٍ تحميل الرسائل...');
+                    const result = await desktop.getContactMessages();
+                    renderContactMessages(result.messages || []);
+                    setStatus('contactInboxStatus', `تم تحديث الصندوق: ${result.messages?.length || 0} رسالة.`);
+                } catch (error) { setStatus('contactInboxStatus', error.message || 'تعذر تحميل الرسائل.'); }
+            };
+            window.updateContactMessageStatus = async function (id, status) {
+                if (await currentRole() !== 'owner') return;
+                try {
+                    await desktop.updateContactMessage({ id, status });
+                    await refreshContactMessages();
+                } catch (error) { setStatus('contactInboxStatus', error.message || 'تعذر تحديث حالة الرسالة.'); }
+            };
+
             window.refreshServerStatus = async function () {
                 if (await currentRole() !== 'owner') return;
                 try {
