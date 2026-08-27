@@ -1,0 +1,9 @@
+node_modules/
+desktop-app/node_modules/
+desktop-app/dist/
+*.env
+.env.*
+*.pem
+*.key
+published/contact-messages.json
+published/*.tmp

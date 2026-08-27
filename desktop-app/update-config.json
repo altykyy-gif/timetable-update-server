@@ -1,0 +1,5 @@
+{
+  "manifestUrl": "https://tighi-timetable-updates.onrender.com/manifest.json",
+  "publishUrl": "https://tighi-timetable-updates.onrender.com/api/publish",
+  "exeUpdateUrl": "https://github.com/altykyy-gif/timetable-update-server/releases/latest/download/"
+}

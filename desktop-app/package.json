@@ -1,0 +1,49 @@
+{
+  "name": "timetable-windows-app",
+  "version": "1.4.0",
+  "description": "تطبيق جدول الحصص المدرسية مع تحديثات عن بعد ولوحة مالك",
+  "main": "main.js",
+  "author": "الأستاذ يحيى التيغي",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win portable nsis",
+    "build:dir": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.tighi.schooltimetable",
+    "productName": "المنظومة التيغية للجداول",
+    "asar": true,
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "update-config.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "artifactName": "Timetable-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "differentialPackage": true
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}
