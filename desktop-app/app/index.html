@@ -12,6 +12,13 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%2370223A' d='M24 3 42 13v22L24 45 6 35V13z'/%3E%3Cpath fill='%23B08A4F' d='M24 8 37 15v18l-13 7-13-7V15zm0 7-6 5v10l6 3 6-3V20z'/%3E%3C/svg%3E">
     
     <style>
+        @font-face {
+            font-family: 'Sultan Medium';
+            src: url('./assets/fonts/Sultan-Medium.ttf') format('truetype');
+            font-style: normal;
+            font-weight: 500 700;
+            font-display: swap;
+        }
         :root {
             --primary-navy: #17283d;
             --primary-dark: #101b2a;
@@ -1152,7 +1159,7 @@
                                 <option value="ruqaa" selected>خط الرقعة (الافتراضي)</option>
                                 <option value="cairo">خط كايرو (Cairo)</option>
                                 <option value="tajawal">خط تجوال (Tajawal)</option>
-                                <option value="sultan">خط سلطان (El Messiri)</option>
+                                <option value="sultan">خط سلطان ميديا (Sultan Medium)</option>
                                 <option value="naskh">خط النسخ (Noto Naskh)</option>
                                 <option value="amiri">خط الأميري (Amiri)</option>
                             </select>
@@ -1283,7 +1290,7 @@
                                 <option value="ruqaa" selected>خط الرقعة (الافتراضي)</option>
                                 <option value="cairo">خط كايرو (Cairo)</option>
                                 <option value="tajawal">خط تجوال (Tajawal)</option>
-                                <option value="sultan">خط سلطان (El Messiri)</option>
+                                <option value="sultan">خط سلطان ميديا (Sultan Medium)</option>
                                 <option value="naskh">خط النسخ (Noto Naskh)</option>
                                 <option value="amiri">خط الأميري (Amiri)</option>
                             </select>
@@ -2286,7 +2293,7 @@
             let fontStack = "'Aref Ruqaa', serif";
             if (fontKey === 'cairo') fontStack = "'Cairo', sans-serif";
             else if (fontKey === 'tajawal') fontStack = "'Tajawal', sans-serif";
-            else if (fontKey === 'sultan') fontStack = "'El Messiri', 'Cairo', sans-serif";
+            else if (fontKey === 'sultan') fontStack = "'Sultan Medium', 'El Messiri', 'Cairo', sans-serif";
             else if (fontKey === 'naskh') fontStack = "'Noto Naskh Arabic', serif";
             else if (fontKey === 'amiri') fontStack = "'Amiri', serif";
             else if (fontKey === 'ruqaa') fontStack = "'Aref Ruqaa', serif";
@@ -2409,7 +2416,7 @@
             classSelect.innerHTML = grades.map(g => `<option value="${g}">${g}</option>`).join('');
             assignGrade.innerHTML = `<option value="ALL">جميع الصفوف</option>` + grades.map(g => `<option value="${g}">${g}</option>`).join('');
             genScope.innerHTML = grades.map(g => `<option value="${g}">${g}</option>`).join('');
-            printGrade.innerHTML = grades.map(g => `<option value="${g}">${g}</option>`).join('');
+            populatePrintGradeFilter();
 
             if (teacherGradeFilter) {
                 teacherGradeFilter.innerHTML = `<option value="ALL">جميع المعلمين (كافة الصفوف)</option>` + 
@@ -3554,7 +3561,7 @@
         }
 
         // ======================= دالة توليد الجداول الفردية الموحدة مع جدول المتابعة =======================
-        function generateTimetableHTML(viewType, targetId, extraSheetClass = '', interactive = true) {
+        function generateTimetableHTML(viewType, targetId, extraSheetClass = '', interactive = true, gradeScope = 'ALL') {
             const days = appData.settings.dayNames || ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
             const periodsCount = appData.settings.periodsPerDay || 7;
             const periodNames = ["الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة", "السادسة", "السابعة", "الثامنة"];
@@ -3650,7 +3657,8 @@
             } else {
                 targetObject = appData.teachers.find(t => t.id === targetId);
                 titleText = `جدول حصص المعلم الأسبوعي`;
-                subTitleText = targetObject ? `الأستاذ / المعلم : ${targetObject.name}` : '';
+                const teacherGradeLabel = gradeScope && gradeScope !== 'ALL' ? ` | الصف : ${gradeScope}` : ' | جميع الصفوف';
+                subTitleText = targetObject ? `الأستاذ / المعلم : ${targetObject.name}${teacherGradeLabel}` : '';
             }
 
             let html = `
@@ -3677,7 +3685,12 @@
                     if (viewType === 'class') {
                         slot = appData.timetable.find(s => s.dayIndex === dayIndex && s.periodIndex === p && s.classId === targetId);
                     } else {
-                        slot = appData.timetable.find(s => s.dayIndex === dayIndex && s.periodIndex === p && s.teacherId === targetId);
+                        slot = appData.timetable.find(s => {
+                            if (s.dayIndex !== dayIndex || s.periodIndex !== p || s.teacherId !== targetId) return false;
+                            if (!gradeScope || gradeScope === 'ALL') return true;
+                            const cls = appData.classes.find(c => c.id === s.classId);
+                            return cls && cls.grade === gradeScope;
+                        });
                     }
 
                     const subjectForSearch = slot ? (appData.subjects.find(s => s.id === slot.subjectId) || { name: 'مادة' }) : null;
@@ -3732,7 +3745,31 @@
         function populatePrintGradeFilter() {
             const grades = Object.keys(appData.curriculum);
             const select = document.getElementById('printGradeFilter');
-            select.innerHTML = grades.map(g => `<option value="${g}">${g}</option>`).join('');
+            if (!select) return;
+            const previous = select.value;
+            select.innerHTML = `<option value="ALL">جميع الصفوف</option>` + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+            select.value = previous && (previous === 'ALL' || grades.includes(previous)) ? previous : 'ALL';
+        }
+
+        function getPrintGradeScope() {
+            const value = document.getElementById('printGradeFilter')?.value || 'ALL';
+            return value === 'ALL' ? 'ALL' : value;
+        }
+
+        function classMatchesPrintGrade(classItem, gradeScope) {
+            return gradeScope === 'ALL' || Boolean(classItem && classItem.grade === gradeScope);
+        }
+
+        function slotMatchesPrintGrade(slot, gradeScope) {
+            if (gradeScope === 'ALL') return true;
+            const cls = appData.classes.find(c => c.id === slot.classId);
+            return Boolean(cls && cls.grade === gradeScope);
+        }
+
+        function teacherMatchesPrintGrade(teacher, gradeScope) {
+            if (gradeScope === 'ALL') return true;
+            return appData.assignments.some(a => a.teacherId === teacher.id && appData.classes.some(c => c.id === a.classId && c.grade === gradeScope))
+                || appData.timetable.some(slot => slot.teacherId === teacher.id && slotMatchesPrintGrade(slot, gradeScope));
         }
 
         function showPrintResizer() {
@@ -3741,11 +3778,11 @@
         }
 
         function printFilteredClasses() {
-            const filterGrade = document.getElementById('printGradeFilter').value;
-            const targetClasses = appData.classes.filter(c => c.grade === filterGrade);
+            const filterGrade = getPrintGradeScope();
+            const targetClasses = appData.classes.filter(c => classMatchesPrintGrade(c, filterGrade));
 
             if (targetClasses.length === 0) {
-                alert('لا توجد فصول دراسية للطباعة في هذا الصف.');
+                alert('لا توجد فصول دراسية للطباعة في النطاق المحدد.');
                 return;
             }
 
@@ -3756,21 +3793,25 @@
         }
 
         function printAllTeachers() {
-            if (appData.teachers.length === 0) {
-                alert('لا يوجد معلمون لطباعة جداولهم.');
+            const filterGrade = getPrintGradeScope();
+            const targetTeachers = appData.teachers.filter(t => teacherMatchesPrintGrade(t, filterGrade));
+            if (targetTeachers.length === 0) {
+                alert('لا يوجد معلمون مرتبطون بالصف المختار للطباعة.');
                 return;
             }
 
             showPrintResizer();
             const printContainer = document.getElementById('bulkPrintContainer');
-            printContainer.innerHTML = appData.teachers.map(t => generateTimetableHTML('teacher', t.id, '', false)).join('');
+            printContainer.innerHTML = targetTeachers.map(t => generateTimetableHTML('teacher', t.id, '', false, filterGrade)).join('');
             printWhenFontsReady();
         }
 
         // تقرير 5: طباعة 4 جداول معلمين في صفحة A4 واحدة (توفيراً للورق)
         function printAllTeachersQuad() {
-            if (appData.teachers.length === 0) {
-                alert('لا يوجد معلمون لطباعة جداولهم.');
+            const filterGrade = getPrintGradeScope();
+            const targetTeachers = appData.teachers.filter(t => teacherMatchesPrintGrade(t, filterGrade));
+            if (targetTeachers.length === 0) {
+                alert('لا يوجد معلمون مرتبطون بالصف المختار للطباعة.');
                 return;
             }
 
@@ -3778,10 +3819,10 @@
             const teachersPerPage = 4;
             let html = '';
 
-            for (let i = 0; i < appData.teachers.length; i += teachersPerPage) {
-                const pageTeachers = appData.teachers.slice(i, i + teachersPerPage);
+            for (let i = 0; i < targetTeachers.length; i += teachersPerPage) {
+                const pageTeachers = targetTeachers.slice(i, i + teachersPerPage);
                 html += `<div class="quad-print-page">`;
-                html += pageTeachers.map(t => generateTimetableHTML('teacher', t.id, 'quad-item', false)).join('');
+                html += pageTeachers.map(t => generateTimetableHTML('teacher', t.id, 'quad-item', false, filterGrade)).join('');
                 html += `</div>`;
             }
 
@@ -3794,11 +3835,11 @@
             const days = appData.settings.dayNames || ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
             const periodsCount = appData.settings.periodsPerDay || 7;
             const periodNames = ["الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة", "السادسة", "السابعة", "الثامنة"];
-            const filterGrade = document.getElementById('printGradeFilter').value;
-            const targetClasses = appData.classes.filter(c => c.grade === filterGrade);
+            const filterGrade = getPrintGradeScope();
+            const targetClasses = appData.classes.filter(c => classMatchesPrintGrade(c, filterGrade));
 
             if (targetClasses.length === 0) {
-                alert('لا توجد فصول مسجلة لهذا الصف.');
+                alert('لا توجد فصول مسجلة في النطاق المحدد.');
                 return;
             }
 
@@ -3810,7 +3851,7 @@
                     <div class="official-doc-header">
                         <div class="official-doc-school">مدرسة : ${appData.settings.schoolName || 'عبدالرحمن الغافقي'}</div>
                         <div class="official-doc-title">جدول متابعة الحصص اليومية ليوم (${day}) - للعام الدراسي : ${appData.settings.academicYear || '2026-2027م'}</div>
-                        <div class="official-doc-subtitle">المرحلة / الصف : ${filterGrade || 'جميع الصفوف'}</div>
+                        <div class="official-doc-subtitle">المرحلة / الصف : ${filterGrade === 'ALL' ? 'جميع الصفوف' : filterGrade}</div>
                     </div>
 
                     <table class="official-word-table" border="1" style="border: 2px solid #000000 !important; border-collapse: collapse !important; border-spacing: 0 !important; width: 100% !important; background:#ffffff !important;">
@@ -3871,16 +3912,21 @@
             showPrintResizer();
             const days = appData.settings.dayNames || ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
             const periodsCount = appData.settings.periodsPerDay || 7;
-            const filterGrade = document.getElementById('printGradeFilter').value;
+            const filterGrade = getPrintGradeScope();
+            const targetTeachers = appData.teachers.filter(t => teacherMatchesPrintGrade(t, filterGrade));
+            if (targetTeachers.length === 0) {
+                alert('لا يوجد معلمون مرتبطون بالصف المختار للطباعة.');
+                return;
+            }
 
             const teachersPerPage = 10;
-            const totalTeachers = appData.teachers.length;
+            const totalTeachers = targetTeachers.length;
             const totalPages = Math.ceil(totalTeachers / teachersPerPage);
 
             let allSheetsHTML = "";
 
             for (let page = 0; page < totalPages; page++) {
-                const pageTeachers = appData.teachers.slice(page * teachersPerPage, (page + 1) * teachersPerPage);
+                const pageTeachers = targetTeachers.slice(page * teachersPerPage, (page + 1) * teachersPerPage);
                 const isLastPage = (page === totalPages - 1);
 
                 allSheetsHTML += `
@@ -3892,7 +3938,7 @@
                                 جدول الحصص الأسبوعي العام لجميع المعلمين - للعام الدراسي : ${appData.settings.academicYear || '2026-2027م'}
                             </div>
                             <div class="official-doc-subtitle">
-                                المرحلة / الصف : ${filterGrade || 'التعليم الأساسي والثانوي'}
+                                المرحلة / الصف : ${filterGrade === 'ALL' ? 'جميع الصفوف' : filterGrade}
                             </div>
                         </div>
 
@@ -3921,13 +3967,13 @@
 
                 pageTeachers.forEach((teacher, idx) => {
                     const globalIdx = (page * teachersPerPage) + idx + 1;
-                    const teacherAssignments = appData.assignments.filter(a => a.teacherId === teacher.id);
+                    const teacherAssignments = appData.assignments.filter(a => a.teacherId === teacher.id && (filterGrade === 'ALL' || appData.classes.some(c => c.id === a.classId && c.grade === filterGrade)));
                     const teacherSubjects = [...new Set(teacherAssignments.map(a => {
                         const sub = appData.subjects.find(s => s.id === a.subjectId);
                         return sub ? sub.name : '';
                     }))].filter(Boolean).join(' + ') || 'عام';
 
-                    const totalAssignedSlots = appData.timetable.filter(s => s.teacherId === teacher.id).length;
+                    const totalAssignedSlots = appData.timetable.filter(s => s.teacherId === teacher.id && slotMatchesPrintGrade(s, filterGrade)).length;
 
                     allSheetsHTML += `
                         <tr>
@@ -3938,7 +3984,7 @@
 
                     days.forEach((day, dayIndex) => {
                         for (let p = 1; p <= periodsCount; p++) {
-                            const slot = appData.timetable.find(s => s.dayIndex === dayIndex && s.periodIndex === p && s.teacherId === teacher.id);
+                            const slot = appData.timetable.find(s => s.dayIndex === dayIndex && s.periodIndex === p && s.teacherId === teacher.id && slotMatchesPrintGrade(s, filterGrade));
                             if (slot) {
                                 const cls = appData.classes.find(c => c.id === slot.classId);
                                 const className = cls ? cls.name : 'فصل';
@@ -4323,7 +4369,7 @@
                     const applied = await desktop.apply();
                     if (applied.updated) { alert(`تم تثبيت الإصدار ${applied.version}. سيتم إعادة تحميل التطبيق الآن.`); await desktop.reloadUpdated(); }
                 } catch (error) { const message = error.message || String(error); if (desktop.showError) desktop.showError(message); else alert(`تعذر التحديث: ${message}`); }
-                finally { if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> تحديث'; } }
+                finally { updateBusy = false; if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> تحديث'; } }
             };
             window.addEventListener('DOMContentLoaded', async () => { try { const role = await currentRole(); applyAuthUi(role); if (role) { startPresence(); checkUpdateSilently(); } } catch { applyAuthUi(null); } });
         })();
