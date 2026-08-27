@@ -509,13 +509,18 @@
                 </div>
             </div>
             <div class="header-actions no-print">
-
                 <div class="desktop-update-tools" id="desktopUpdateTools">
                     <button type="button" class="desktop-update-btn" id="checkUpdateBtn" onclick="checkForAppUpdate()" title="فحص وتثبيت آخر إصدار">
                         <i class="fa-solid fa-arrows-rotate"></i> تحديث
                     </button>
-                    <button type="button" class="desktop-update-btn" onclick="openOwnerPanel()" title="لوحة المالك">
+                    <button type="button" class="desktop-update-btn" id="loginBtn" onclick="openLoginPanel()" title="تسجيل الدخول">
+                        <i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول
+                    </button>
+                    <button type="button" class="desktop-update-btn" id="ownerOpenBtn" onclick="openOwnerPanel()" title="لوحة المالك" style="display:none">
                         <i class="fa-solid fa-user-shield"></i> المالك
+                    </button>
+                    <button type="button" class="desktop-update-btn" id="logoutBtn" onclick="logoutApp()" title="تسجيل الخروج" style="display:none">
+                        <i class="fa-solid fa-right-from-bracket"></i> خروج
                     </button>
                 </div>
                 <button type="button" class="header-theme-toggle" id="themeToggleBtn" onclick="toggleDarkMode()" aria-pressed="false" title="تبديل الوضع المظلم">
@@ -3751,24 +3756,32 @@
         }
     </script>
 
+    
+    <div class="modal-overlay active" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+        <div class="modal-card desktop-modal-card" style="max-width:560px;">
+            <div class="modal-header">
+                <h3 class="card-title" id="loginModalTitle"><i class="fa-solid fa-lock"></i> تسجيل الدخول</h3>
+            </div>
+            <div class="desktop-owner-note">اختر نوع الحساب. حساب المستخدم يتيح استعمال البرنامج والتحديث، بينما حساب المالك يضيف لوحة تعديل الكود ونشر الإصدارات.</div>
+            <div class="form-group" style="margin-bottom:12px;"><label for="loginRole">نوع الحساب</label><select id="loginRole" class="form-control"><option value="user">مستخدم</option><option value="owner">مالك</option></select></div>
+            <div class="form-group"><label for="loginPassword">كلمة المرور</label><input id="loginPassword" class="form-control" type="password" autocomplete="current-password" placeholder="أدخل كلمة المرور"></div>
+            <button type="button" class="btn btn-primary" style="margin-top:16px;width:100%;" onclick="loginApp()"><i class="fa-solid fa-right-to-bracket"></i> دخول</button>
+            <div class="desktop-update-status" id="loginStatus"></div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="ownerModal" role="dialog" aria-modal="true" aria-labelledby="ownerModalTitle">
         <div class="modal-card desktop-modal-card">
             <div class="modal-header">
                 <h3 class="card-title" id="ownerModalTitle"><i class="fa-solid fa-user-shield"></i> لوحة المالك وتحديث النسخة</h3>
                 <button type="button" class="btn btn-outline btn-sm" onclick="closeOwnerPanel()" aria-label="إغلاق">إغلاق</button>
             </div>
-            <div class="desktop-owner-note">
-                هذه اللوحة مخصصة للمالك. عدّل الكود عند الحاجة ثم انشر إصدارًا جديدًا. لا يتم اعتماد النشر إلا بعد التحقق من كلمة مرور المالك في خادم التحديث.
-            </div>
+            <div class="desktop-owner-note">تم التحقق من صلاحية المالك على الخادم. عدّل الكود عند الحاجة، ثم انشر رقم إصدار أعلى. جلسة المالك مؤقتة وتنتهي تلقائيًا.</div>
             <div class="form-row">
-                <div class="form-group"><label for="ownerPassword">كلمة مرور المالك</label><input id="ownerPassword" class="form-control" type="password" autocomplete="off" placeholder="تُرسل للخادم ولا تُحفظ داخل التطبيق"></div>
                 <div class="form-group"><label for="ownerVersion">رقم الإصدار الجديد</label><input id="ownerVersion" class="form-control" type="text" value="1.0.1" placeholder="مثال: 1.0.1"></div>
                 <div class="form-group"><label for="ownerNotes">ملاحظات الإصدار</label><input id="ownerNotes" class="form-control" type="text" placeholder="إصلاح مشكلة الطباعة مثلًا"></div>
             </div>
-            <div class="form-group">
-                <label for="ownerSource">كود النسخة المنشورة HTML</label>
-                <textarea id="ownerSource" class="form-control desktop-source-editor" spellcheck="false" placeholder="اضغط تحميل الكود الحالي"></textarea>
-            </div>
+            <div class="form-group"><label for="ownerSource">كود النسخة المنشورة HTML</label><textarea id="ownerSource" class="form-control desktop-source-editor" spellcheck="false" placeholder="اضغط تحميل الكود الحالي"></textarea></div>
             <div class="form-row" style="margin-top:12px; margin-bottom:0;">
                 <button type="button" class="btn btn-outline" onclick="loadOwnerSource()"><i class="fa-solid fa-download"></i> تحميل الكود الحالي</button>
                 <button type="button" class="btn btn-primary" onclick="publishOwnerSource()"><i class="fa-solid fa-cloud-arrow-up"></i> نشر الإصدار</button>
@@ -3779,12 +3792,77 @@
     </div>
 
     <script>
-        (function installDesktopUpdateUi() {
+        (function installAuthUi() {
             const desktop = window.desktopUpdates;
             const tools = document.getElementById('desktopUpdateTools');
-            if (!desktop && tools) tools.style.display = 'none';
+            if (!desktop) { if (tools) tools.style.display = 'none'; return; }
 
+            function setStatus(id, message) { const el = document.getElementById(id); if (el) el.textContent = message || ''; }
+            function currentRole() { return desktop.role(); }
+            function applyAuthUi(role) {
+                const loggedIn = role === 'owner' || role === 'user';
+                const loginBtn = document.getElementById('loginBtn');
+                const ownerBtn = document.getElementById('ownerOpenBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : 'inline-flex';
+                if (ownerBtn) ownerBtn.style.display = role === 'owner' ? 'inline-flex' : 'none';
+                if (logoutBtn) logoutBtn.style.display = loggedIn ? 'inline-flex' : 'none';
+                const loginModal = document.getElementById('loginModal');
+                if (loginModal) loginModal.classList.toggle('active', !loggedIn);
+            }
+
+            window.openLoginPanel = function () {
+                const modal = document.getElementById('loginModal');
+                if (modal) modal.classList.add('active');
+                const input = document.getElementById('loginPassword');
+                if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
+            };
+            window.loginApp = async function () {
+                const role = document.getElementById('loginRole').value;
+                const password = document.getElementById('loginPassword').value;
+                if (!password) { setStatus('loginStatus', 'أدخل كلمة المرور.'); return; }
+                const button = document.querySelector('#loginModal .btn-primary');
+                if (button) button.disabled = true;
+                setStatus('loginStatus', 'جارٍ التحقق من الحساب...');
+                try {
+                    const result = await desktop.login({ role, password });
+                    applyAuthUi(result.role);
+                    setStatus('loginStatus', 'تم تسجيل الدخول بنجاح.');
+                } catch (error) {
+                    applyAuthUi(null);
+                    setStatus('loginStatus', error.message || 'تعذر تسجيل الدخول.');
+                } finally { if (button) button.disabled = false; }
+            };
+            window.logoutApp = async function () {
+                await desktop.logout();
+                applyAuthUi(null);
+                setStatus('loginStatus', 'تم تسجيل الخروج.');
+            };
+            window.openOwnerPanel = async function () {
+                if (await currentRole() !== 'owner') { openLoginPanel(); return; }
+                const modal = document.getElementById('ownerModal');
+                if (modal) modal.classList.add('active');
+                setStatus('ownerStatus', 'اضغط «تحميل الكود الحالي» لبدء التعديل.');
+            };
+            window.closeOwnerPanel = function () { const modal = document.getElementById('ownerModal'); if (modal) modal.classList.remove('active'); };
+            window.loadOwnerSource = async function () {
+                try { setStatus('ownerStatus', 'جارٍ تحميل الكود الحالي...'); document.getElementById('ownerSource').value = await desktop.readSource(); setStatus('ownerStatus', 'تم تحميل الكود. عدّله ثم اكتب رقم إصدار أعلى وانشره.'); }
+                catch (error) { setStatus('ownerStatus', error.message || 'تعذر تحميل الكود.'); }
+            };
+            window.publishOwnerSource = async function () {
+                if (await currentRole() !== 'owner') { closeOwnerPanel(); openLoginPanel(); return; }
+                const version = document.getElementById('ownerVersion').value.trim();
+                const notes = document.getElementById('ownerNotes').value.trim();
+                const source = document.getElementById('ownerSource').value;
+                if (!version || !source) { setStatus('ownerStatus', 'أدخل رقم الإصدار وحمّل الكود قبل النشر.'); return; }
+                if (!/^\d+\.\d+\.\d+$/.test(version)) { setStatus('ownerStatus', 'صيغة الإصدار يجب أن تكون مثل 1.0.1'); return; }
+                if (!confirm(`سيتم نشر الإصدار ${version} لجميع المستخدمين. متابعة؟`)) return;
+                try { setStatus('ownerStatus', 'جارٍ رفع النسخة والتحقق منها...'); const result = await desktop.publishSource({ version, notes, html: source }); setStatus('ownerStatus', result.message || 'تم نشر الإصدار بنجاح.'); alert(result.message || 'تم نشر الإصدار بنجاح.'); }
+                catch (error) { setStatus('ownerStatus', `فشل النشر: ${error.message || error}`); }
+            };
             window.checkForAppUpdate = async function () {
+                const role = await currentRole();
+                if (!role) { openLoginPanel(); return; }
                 const button = document.getElementById('checkUpdateBtn');
                 if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جارٍ الفحص...'; }
                 try {
@@ -3795,52 +3873,11 @@
                     if (!confirm(`يوجد إصدار جديد ${result.latestVersion} بدلًا من ${result.currentVersion}.${notes}\\n\\nهل تريد تنزيله وتثبيته الآن؟`)) return;
                     if (button) button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جارٍ التنزيل...';
                     const applied = await desktop.apply();
-                    if (applied.updated) {
-                        alert(`تم تثبيت الإصدار ${applied.version}. سيتم إعادة تحميل التطبيق الآن.`);
-                        await desktop.reloadUpdated();
-                    }
-                } catch (error) {
-                    const message = error && error.message ? error.message : String(error);
-                    if (desktop.showError) desktop.showError(message); else alert(`تعذر التحديث: ${message}`);
-                } finally {
-                    if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> تحديث'; }
-                }
+                    if (applied.updated) { alert(`تم تثبيت الإصدار ${applied.version}. سيتم إعادة تحميل التطبيق الآن.`); await desktop.reloadUpdated(); }
+                } catch (error) { const message = error.message || String(error); if (desktop.showError) desktop.showError(message); else alert(`تعذر التحديث: ${message}`); }
+                finally { if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> تحديث'; } }
             };
-
-            window.openOwnerPanel = function () {
-                const modal = document.getElementById('ownerModal');
-                if (modal) modal.classList.add('active');
-                const status = document.getElementById('ownerStatus');
-                if (status) status.textContent = 'أدخل كلمة المرور ثم اضغط «تحميل الكود الحالي». الصلاحية تُتحقق عند النشر.';
-            };
-            window.closeOwnerPanel = function () {
-                const modal = document.getElementById('ownerModal');
-                if (modal) modal.classList.remove('active');
-            };
-            window.loadOwnerSource = async function () {
-                const status = document.getElementById('ownerStatus');
-                try {
-                    if (status) status.textContent = 'جارٍ تحميل الكود الحالي...';
-                    document.getElementById('ownerSource').value = await desktop.readSource();
-                    if (status) status.textContent = 'تم تحميل الكود. عدّله ثم أدخل رقم إصدار أعلى وانشره.';
-                } catch (error) { if (status) status.textContent = `تعذر تحميل الكود: ${error.message || error}`; }
-            };
-            window.publishOwnerSource = async function () {
-                const password = document.getElementById('ownerPassword').value.trim();
-                const version = document.getElementById('ownerVersion').value.trim();
-                const notes = document.getElementById('ownerNotes').value.trim();
-                const source = document.getElementById('ownerSource').value;
-                const status = document.getElementById('ownerStatus');
-                if (!password || !version || !source) { if (status) status.textContent = 'أكمل كلمة المرور ورقم الإصدار وحمّل الكود قبل النشر.'; return; }
-                if (!/^\d+\.\d+\.\d+$/.test(version)) { if (status) status.textContent = 'صيغة الإصدار يجب أن تكون مثل 1.0.1'; return; }
-                if (!confirm(`سيتم نشر الإصدار ${version} لجميع المستخدمين بعد ضغطهم زر التحديث. متابعة؟`)) return;
-                try {
-                    if (status) status.textContent = 'جارٍ رفع النسخة والتحقق منها...';
-                    const result = await desktop.publishSource({ password, version, notes, html: source });
-                    if (status) status.textContent = result.message || 'تم نشر الإصدار بنجاح.';
-                    alert(result.message || 'تم نشر الإصدار بنجاح.');
-                } catch (error) { if (status) status.textContent = `فشل النشر: ${error.message || error}`; }
-            };
+            window.addEventListener('DOMContentLoaded', async () => { try { applyAuthUi(await currentRole()); } catch { applyAuthUi(null); } });
         })();
     </script>
 
